@@ -8,7 +8,7 @@ from sqlalchemy import engine_from_config, pool
 from logging.config import fileConfig
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = os.path.dirname(os.path.dirname(cur_dir))
+src_dir = os.path.dirname(os.path.dirname(os.path.dirname(cur_dir)))
 sys.path.append(src_dir)
 from server.models import Model
 
