@@ -4,7 +4,7 @@ from .tornado_api import API
 from .redis_manager import RedisManager
 from .sqlalchemy_db import DataBase
 
-from server.instance import SETTINGS, DB_URI, TEST_DB_URI, DEVE_DB_URI
+from server.instance import SETTINGS, DB_URI, TEST_DB_URI, DEVE_DB_URI, REDIS_CONFIG
 
 
 def create_app(handlers, mode='production'):
@@ -38,6 +38,7 @@ def create_app(handlers, mode='production'):
         )
 
     app.mode = mode
+    app.redis_config = REDIS_CONFIG.copy()
 
     redis = RedisManager()
     database = DataBase()
