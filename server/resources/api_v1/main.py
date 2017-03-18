@@ -2,7 +2,7 @@ import json
 
 from tornado.websocket import WebSocketClosedError
 
-from server.api_v1 import apiv1, BaseHandler, WSBaseHandler
+from server.resources.api_v1 import apiv1, BaseHandler, WSBaseHandler
 
 main = apiv1.create_resource('main', prefix='/main')
 

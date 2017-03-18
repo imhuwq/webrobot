@@ -4,8 +4,8 @@ from urllib.parse import urlencode
 from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.testing import gen_test
 
-from server.api_v1 import apiv1
 from server.application import create_app
+from server.resources.api_v1 import apiv1
 from server.tests.unit import ServerTestBase
 from server.tests.unit.application.test_v1_handlers import test_v1
 

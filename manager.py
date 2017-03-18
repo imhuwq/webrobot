@@ -1,13 +1,13 @@
+import logging
+import signal
 import sys
 import time
-import signal
-import logging
 
 from tornado import httpserver, ioloop, options
 
-from server.api_v1 import apiv1
-from server.tests import UnitTest
 from server.application import create_app
+from server.resources.api_v1 import apiv1
+from server.tests import UnitTest
 
 if __name__ == '__main__':
     cmd = sys.argv[1]

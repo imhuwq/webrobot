@@ -1,8 +1,8 @@
-from tornado.web import authenticated
 from tornado.gen import coroutine
+from tornado.web import authenticated
 
 from server.models import User
-from server.api_v1 import apiv1, BaseHandler
+from server.resources.api_v1 import apiv1, BaseHandler
 
 user = apiv1.create_resource('user', prefix='/user')
 
