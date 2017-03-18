@@ -1,0 +1,9 @@
+# for ide
+.idea
+
+# for python
+*.pyc
+
+# for test
+te.*
+test.sqlite
