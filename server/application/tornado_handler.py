@@ -7,7 +7,7 @@ from tornado.websocket import WebSocketHandler
 from server.application.redis_session import Session
 from server.application.sqlalchemy_db import User
 
-from server.modules import Email
+from server.extentions import Email
 
 
 class BaseHandler(RequestHandler):
