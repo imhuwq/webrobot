@@ -37,7 +37,7 @@ class UserProfile(BaseHandler):
         return self.write({'uuid': self.user_uuid})
 
 
-@user.route('/(?P<city>[^\/]*)/fans')
+@user.route('/<city>/fans')
 class FansOfCity(BaseHandler):
     def get(self, city):
         return self.write(city)
