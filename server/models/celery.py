@@ -4,8 +4,9 @@ from enum import Enum
 
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
-
 import celery.schedules
+
+from server.utils import gen_uuid
 from server.application.sqlalchemy_db import Model
 
 
@@ -30,6 +31,7 @@ class Interval(Model):
     __tablename__ = "interval"
 
     id = Column(Integer, primary_key=True)
+    uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
     _every = Column("every", Integer, default=0, nullable=False)
     _period = Column("period", String)
 
@@ -66,6 +68,8 @@ class Crontab(Model):
     __tablename__ = "crontab"
 
     id = Column(Integer, primary_key=True)
+    uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
+
     minute = Column(String, default='*', nullable=False)
     hour = Column(String, default='*', nullable=False)
     day_of_week = Column(String, default='*', nullable=False)
@@ -85,6 +89,7 @@ class PeriodicTask(Model):
     __tablename__ = "periodic_task"
 
     id = Column(Integer, primary_key=True)
+    uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
 
     _role = Column("role", String, default=TaskRole.INITIALIZER.value)
     name = Column(String, unique=True)

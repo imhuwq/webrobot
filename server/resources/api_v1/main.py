@@ -1,16 +1,6 @@
-import json
-
-from tornado.websocket import WebSocketClosedError
-
-from server.resources.api_v1 import apiv1, BaseHandler, WSBaseHandler
+from server.resources.api_v1 import apiv1, BaseHandler
 
 main = apiv1.create_resource('main', prefix='/main')
-
-
-@apiv1.route(r'/')
-class APIHome(BaseHandler):
-    def get(self):
-        return self.write('api page')
 
 
 @main.route(r'/')
@@ -31,25 +21,3 @@ class XsrfToken(BaseHandler):
         token = self.xsrf_token
         token = token.decode()
         return self.write({'token': token})
-
-
-@main.route('/chat/index')
-class VideoChatDemo(WSBaseHandler):
-    clients = set()
-
-    def open(self):
-        if self.current_user:
-            VideoChatDemo.clients.add(self)
-            super().open()
-        else:
-            self.write_message('WebSocket Connection Refused! Login Required.')
-
-    def on_message(self, message):
-        message = json.loads(message)
-        for client in VideoChatDemo.clients:
-            try:
-                client.write_message(message)
-                print('ok')
-            except WebSocketClosedError:
-                print('fail')
-                client.close()

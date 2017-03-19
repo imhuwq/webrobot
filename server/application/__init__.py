@@ -24,6 +24,7 @@ def create_app(handlers, mode='production'):
             **settings
         )
     elif mode == 'develop':
+        settings['xsrf_cookies'] = False
         settings['debug'] = True
         app = Application(
             handlers=handlers,

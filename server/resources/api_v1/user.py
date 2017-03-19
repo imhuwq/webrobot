@@ -1,10 +1,12 @@
+from itertools import compress
 from tornado.gen import coroutine
-from tornado.web import authenticated
 
 from server.models import User
+from server.utils import gen_uuid
 from server.resources.api_v1 import apiv1, BaseHandler
+from server.application.tornado_handler import Argument, login_required
 
-user = apiv1.create_resource('user', prefix='/user')
+user = apiv1.create_resource('user', prefix='/users')
 
 
 # get current user info
@@ -12,24 +14,30 @@ user = apiv1.create_resource('user', prefix='/user')
 class UserIndex(BaseHandler):
     def get(self):
         if self.current_user:
-            self.response.update({'status': 1,
-                                  'name': self.current_user.name,
-                                  'email': self.current_user.email,
-                                  'isAnonymous': False})
+            info = {'name': self.current_user.name,
+                    'email': self.current_user.email,
+                    'uuid': self.current_user.uuid,
+                    'isAnonymous': False}
         else:
-            self.response.update({'status': 0,
-                                  'name': 'anonymousUser',
-                                  'email': 'anonymouse@example.com',
-                                  'isAnonymous': True})
-        return self.write(self.response)
+            info = {'name': 'anonymousUser',
+                    'email': 'anonymouse@example.com',
+                    'uuid': gen_uuid(),
+                    'isAnonymous': True}
+        self.start_response(**info)
 
 
-# get user profile in detail
-@user.route('/profile/')
+# get specified user profile
+@user.route('/(?P<user_uuid>[^\/]+)/profile/')
 class UserProfile(BaseHandler):
-    @authenticated
-    def get(self):
-        return self.write('user profile')
+    def get(self, user_uuid):
+        user_ = self.query(User).filter_by(uuid=user_uuid).first()
+        if user_ is not None:
+            info = {'name': self.current_user.name,
+                    'email': self.current_user.email,
+                    'uuid': self.current_user.uuid}
+            self.start_response(**info)
+        else:
+            self.raise_error(404, -1, 'user does not exist')
 
 
 # user login
@@ -38,18 +46,15 @@ class UserLogin(BaseHandler):
     @coroutine
     def post(self):
         if self.current_user:
-            self.response.update({'status': 0, 'msg': 'user is already logged in'})
+            self.start_response(status=0, msg='user is already logged in')
         else:
-            email = self.get_argument('email')
-            password = self.get_argument('password')
+            email, password = self.parse_arguments([Argument('email'), Argument('password')])
             logging_user = self.query(User).filter_by(email=email).first()
             if logging_user and logging_user.authenticate(password):
                 yield self.login(logging_user)
-                self.response.update({'status': 1, 'msg': 'login success'})
+                self.start_response(status=1, msg='login success')
             else:
-                self.response.update({'status': -1, 'msg': 'invalid email or password'})
-
-        return self.write(self.response)
+                self.raise_error(400, msg='invalid email or password')
 
 
 # user logout
@@ -58,10 +63,9 @@ class UserLogout(BaseHandler):
     def post(self):
         if self.current_user:
             self.logout()
-            self.response.update({'status': 1, 'msg': 'logout success'})
+            self.start_response(msg='logout success')
         else:
-            self.response.update({'status': 0, 'msg': 'user is not logged in'})
-        return self.write(self.response)
+            self.start_response(status=0, msg='user is not logged in')
 
 
 # user register
@@ -70,109 +74,93 @@ class UserRegister(BaseHandler):
     @coroutine
     def post(self):
         if self.current_user:
-            self.response.update({'status': 0, 'msg': 'user is logged in'})
+            self.start_response(status=0, msg='user is logged in')
         else:
-            name = self.get_argument('name')
-            email = self.get_argument('email')
-            password = self.get_argument('password')
+            name, email, password = self.parse_arguments([Argument('name'),
+                                                          Argument('email'),
+                                                          Argument('password')])
+
             name_is_valid = User.validate_name(name)
             email_is_valid = User.validate_email(email)
             password_is_valid = User.validate_password(password)
+            validate_info = [name_is_valid, email_is_valid, password_is_valid]
 
-            if not all([name_is_valid, email_is_valid, password_is_valid]):
-                invalid = []
-                self.response.update({'status': -1, 'msg': 'invalid user info', 'invalid': invalid})
-                if not name_is_valid:
-                    invalid.append('name')
-                if not email_is_valid:
-                    invalid.append('email')
-                if not password_is_valid:
-                    invalid.append('password')
-
+            if not all(validate_info):
+                invalid = ['name', 'email', 'password']
+                invalid = list(compress(invalid, validate_info))
+                self.raise_error(400, msg='invalid user info', invalid=invalid)
             else:
                 existed_user = self.query(User).filter((User.name == name) | (User.email == email)).first()
                 if existed_user:
-                    in_use = []
-                    self.response.update({'status': -2, 'msg': 'user info is in use', 'inUse': in_use})
-                    if existed_user.email == email:
-                        in_use.append('email')
-                    if existed_user.name == name:
-                        in_use.append('name')
+                    in_use = ['email', 'name']
+                    in_use_info = [existed_user.email == email, existed_user.name == name]
+                    in_use = list(compress(in_use, in_use_info))
+                    self.raise_error(400, msg='user info is in use', in_use=in_use)
                 else:
                     new_user = User(name=name, email=email)
                     new_user.set_password(password)
                     self.db.session.add(new_user)
                     self.db.session.commit()
-                    self.response.update({'status': 1, 'msg': '', 'password': password, 'name': name, 'email': email})
+                    info = {'password': password, 'name': name, 'email': email}
                     yield self.login(new_user)
-
-        return self.write(self.response)
+                    self.start_response(**info)
 
 
 # change user password
-@user.route('/password/change')
+@user.route('/(?P<user_uuid>[^\/]+)/password/change')
 class UserChangePassword(BaseHandler):
-    def post(self):
-        if self.current_user:
-            self.get_argument()
-            password = self.get_argument('password')
-            new_password = self.get_argument('new_password')
-            if not self.current_user.authenticate(password):
-                self.response.update({'status': -1, 'msg': 'incorrect current password'})
-            else:
-                if not User.validate_password(new_password):
-                    self.response.update({'status': -1, 'msg': 'password is not secure enough'})
-                else:
-                    self.current_user.set_password(new_password)
-                    self.db_session.commit()
-                    self.response.update({'status': 1, 'msg': 'password updated successfully'})
+    @login_required
+    def post(self, user_uuid):
+        (password, new_password) = self.parse_arguments([Argument('password'),
+                                                         Argument('new_password')])
+        if not self.current_user.authenticate(password):
+            self.raise_error(400, msg='current password is incorrect')
         else:
-            self.response.update({'status': 0, 'msg': 'you are not a registered user'})
-        return self.write(self.response)
+            if not User.validate_password(new_password):
+                self.raise_error(400, msg='password is not secure enough')
+            else:
+                self.current_user.set_password(new_password)
+                self.db_session.commit()
+                self.start_response(msg='password updated successfully')
 
 
 # user forget password
-@user.route('/password/forget')
+@user.route('/(?P<user_uuid>[^\/]+)/password')
 class UserForgetPassword(BaseHandler):
-    def get(self):
-        email_addr = self.get_argument('email')
-        existed_user = self.query(User).filter_by(email=email_addr).first()
+    def get(self, user_uuid):
+        existed_user = self.query(User).filter_by(uuid=user_uuid).first()
         if existed_user is not None:
             auth_token = existed_user.gen_auth_token()
+            email = existed_user.email
 
-            email_content = 'Someone reported that you have forgotten your password. ' \
-                            'If that is true, click this link to reset your password:' \
+            email_content = 'Someone reported that you have forgot your password. ' \
+                            'Click the following link to reset your password:' \
                             ' {0}?email={1}&token={2}.' \
-                            'Or you can ignore it if that is not initiated by you'. \
-                format(self.reverse_url('api_v1.user.UserResetPassword'), email_addr, auth_token)
+                            'Or you can ignore this message if that is not initiated by you'. \
+                format(self.reverse_url('api_v1.user.UserForgetPassword', user_uuid), email, auth_token)
 
-            self.send_email(receiver=email_addr, subject='Reset Password', content=email_content)
+            self.send_email(receiver=email, subject='Reset Password', content=email_content)
 
             self.response.update(
                 {'status': 1,
-                 'msg': 'an instruction about resetting password has been emailed to you, '
-                        'check your inbox to continue'})
+                 'msg': 'an instruction of resetting password sent to your email, '
+                        'please check your inbox to continue'})
         else:
             self.response.update({'status': -1, 'msg': 'invalid email address'})
         return self.write(self.response)
 
-
-# user reset password using token
-@user.route('/password/reset')
-class UserResetPassword(BaseHandler):
-    def post(self):
-        email = self.get_argument('email')
-
-        existed_user = self.query(User).filter_by(email=email).first()
+    def post(self, user_uuid):
+        existed_user = self.query(User).filter_by(uuid=user_uuid).first()
         if existed_user:
-            token = self.get_argument('token')
+            token, password = self.parse_arguments([Argument('token'),
+                                                    Argument('password')])
             if token == user.auth_token:
-                password = self.get_argument('password')
                 if User.validate_password(password):
                     existed_user.set_password(password)
                     existed_user.gen_auth_token()
-                    self.response.update({'status': 1, 'msg': 'password reset'})
+                    self.start_response(msg='password reset')
                 else:
-                    self.response.update({'status': -1, 'msg': 'invalid password'})
-        self.response.update({'status': 0, 'msg': 'invalid request'})
-        return self.write(self.response)
+                    self.start_response(status=-1, msg='new password is invalid, perhaps not secure enough')
+            else:
+                self.raise_error(400, msg='invalid token')
+        self.raise_error(404, msg='user does not exist')

@@ -1,8 +1,8 @@
-import uuid
-
 from sqlalchemy import create_engine, Column, String, Integer
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base
+
+from server.utils import gen_uuid
 
 
 class DataBaseURIError(BaseException):
@@ -31,10 +31,6 @@ class DataBase:
 
     def drop_all(self):
         self.Model.metadata.drop_all(self.engine)
-
-
-def gen_uuid():
-    return uuid.uuid4().hex
 
 
 class User(Model):
