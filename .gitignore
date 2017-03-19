@@ -7,3 +7,6 @@
 # for test
 te.*
 test.sqlite
+
+# for sensative data
+server/instance/*
