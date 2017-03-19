@@ -1,3 +1,8 @@
+import re
+
+path_argument_pattern = re.compile(r'(<.*?>)')
+
+
 class API:
     def __init__(self, name, prefix):
         self.name = name
@@ -54,6 +59,7 @@ class _Resource:
         if path.startswith('/'):
             path = path[1:]
         path = '{0}{1}'.format(prefix, path)
+        path = path_argument_pattern.sub(r'(?P\1[^/]+)', path)
 
         def handler_wrapper(handler):
             if name is None:

@@ -27,14 +27,14 @@ class UserIndex(BaseHandler):
 
 
 # get specified user profile
-@user.route('/(?P<user_uuid>[^\/]+)/profile/')
+@user.route('/<user_uuid>/profile/')
 class UserProfile(BaseHandler):
     def get(self, user_uuid):
         user_ = self.query(User).filter_by(uuid=user_uuid).first()
         if user_ is not None:
-            info = {'name': self.current_user.name,
-                    'email': self.current_user.email,
-                    'uuid': self.current_user.uuid}
+            info = {'name': user_.name,
+                    'email': user_.email,
+                    'uuid': user_.uuid}
             self.start_response(**info)
         else:
             self.raise_error(404, -1, 'user does not exist')
@@ -107,7 +107,7 @@ class UserRegister(BaseHandler):
 
 
 # change user password
-@user.route('/(?P<user_uuid>[^\/]+)/password/change')
+@user.route('/<user_uuid>/password/change')
 class UserChangePassword(BaseHandler):
     @login_required
     def post(self, user_uuid):
@@ -125,7 +125,7 @@ class UserChangePassword(BaseHandler):
 
 
 # user forget password
-@user.route('/(?P<user_uuid>[^\/]+)/password')
+@user.route('/<user_uuid>/password')
 class UserForgetPassword(BaseHandler):
     def get(self, user_uuid):
         existed_user = self.query(User).filter_by(uuid=user_uuid).first()
