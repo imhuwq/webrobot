@@ -7,7 +7,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from celery.utils.log import get_logger
 from celery.beat import Scheduler, event_t, heapq
 
-from server.models.celery import PeriodicTask
+from server.models.celery import PeriodicTask, TaskRole
 from server.modules.celery.beat.entry import SAScheduleEntry
 from server.instance.celery_config import CELERY_BEAT_DB_URI
 
@@ -56,7 +56,7 @@ class SAScheduler(Scheduler):
 
     @property
     def objects(self):
-        objs = self.query(self.Model).filter_by(enabled=True).all()
+        objs = self.query(self.Model).filter_by(enabled=True, _role=TaskRole.INITIALIZER.value).all()
         return objs
 
     def get_from_database(self):

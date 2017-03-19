@@ -55,8 +55,6 @@ class SAScheduleEntry(ScheduleEntry):
         return self.schedule.is_due(self.last_run_at)
 
     def __repr__(self):
-        return (u'<{0} ({1} {2}(*{3}, **{4}) {{5}})>'.format(
+        return (u'<{0}:{1}> task:{2}, schedule:{3}'.format(
             self.__class__.__name__,
-            self.name, self.task, self.args,
-            self.kwargs, self.schedule,
-        ))
+            self.name, self.task, self.schedule))

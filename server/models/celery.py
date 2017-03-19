@@ -17,6 +17,12 @@ class PERIODS(Enum):
     MICROSECONDS = 'microseconds'
 
 
+class TaskRole(Enum):
+    CHORDS = 'chords'
+    INITIALIZER = 'initializer'
+    CALLBACK = 'callback'
+
+
 ValidationError = type("ValidationError", (BaseException,), {})
 
 
@@ -80,16 +86,95 @@ class PeriodicTask(Model):
 
     id = Column(Integer, primary_key=True)
 
+    _role = Column("role", String, default=TaskRole.INITIALIZER.value)
     name = Column(String, unique=True)
     task = Column(String, nullable=False)
+    _args = Column("args", Text)  # list
+    _kwargs = Column("kwargs", Text)  # dict
+    _options = Column("options", Text)  # dict
 
-    _args = Column(Text)  # list
-    _kwargs = Column(Text)  # dict
+    initializer_task_id = Column(Integer, ForeignKey('periodic_task.id'))
+    initializer = relationship("PeriodicTask", foreign_keys=[initializer_task_id], remote_side=id,
+                               backref=backref('chord_tasks'))
 
-    queue = Column(String)
-    exchange = Column(String)
-    routing_key = Column(String)
-    soft_time_limit = Column(Integer)
+    header_task_id = Column(Integer, ForeignKey('periodic_task.id'))
+    header = relationship("PeriodicTask", foreign_keys=[header_task_id], remote_side=id,
+                          backref=backref('callback_task', uselist=False))
+
+    @property
+    def options(self):
+        if self._options:
+            ops = json.loads(self._options)
+            if isinstance(ops, dict):
+                return ops
+        return dict()
+
+    @options.setter
+    def options(self, value):
+        if isinstance(value, str):
+            value = json.loads(value)
+        if isinstance(value, dict):
+            self._options = json.dumps(value)
+
+    @property
+    def queue(self):
+        if self.options:
+            q = self.options.get("queue", None)
+            if isinstance(q, str):
+                return q
+        return None
+
+    @queue.setter
+    def queue(self, value):
+        value = str(value)
+        options = self.options
+        options["queue"] = value
+        self.options = options
+
+    @property
+    def exchange(self):
+        if self.options:
+            ex = self.options.get("exchange", None)
+            if isinstance(ex, str):
+                return ex
+        return None
+
+    @exchange.setter
+    def exchange(self, value):
+        value = str(value)
+        options = self.options
+        options["exchange"] = value
+        self.options = options
+
+    @property
+    def routing_key(self):
+        if self.options:
+            rt = self.options.get("routing_key", None)
+            if isinstance(rt, str):
+                return rt
+        return None
+
+    @routing_key.setter
+    def routing_key(self, value):
+        value = str(value)
+        options = self.options
+        options["routing_key"] = value
+        self.options = options
+
+    @property
+    def soft_time_limit(self):
+        if self.options:
+            tlm = self.options.get("soft_time_limit", None)
+            if isinstance(tlm, int):
+                return tlm
+        return None
+
+    @soft_time_limit.setter
+    def soft_time_limit(self, value):
+        value = int(value)
+        options = self.options
+        options["soft_time_limit"] = value
+        self.options = options
 
     expires = Column(DateTime)
     start_after = Column(DateTime)
@@ -97,8 +182,8 @@ class PeriodicTask(Model):
 
     last_run_at = Column(DateTime)
 
-    _total_run_count = Column(Integer, default=0)
-    _max_run_count = Column(Integer, default=0)
+    _total_run_count = Column("total_run_count", Integer, default=0)
+    _max_run_count = Column("max_run_count", Integer, default=0)
 
     date_changed = Column(DateTime)
     description = Column(String)
@@ -115,10 +200,11 @@ class PeriodicTask(Model):
 
     @property
     def args(self):
-        ret = json.loads(self._args)
-        if isinstance(ret, list):
-            return ret
-        return []
+        if self._args:
+            ret = json.loads(self._args)
+            if isinstance(ret, list):
+                return ret
+        return list()
 
     @args.setter
     def args(self, value):
@@ -131,7 +217,23 @@ class PeriodicTask(Model):
 
     @property
     def kwargs(self):
-        return self._kwargs
+        real_kwargs = dict()
+        if self._kwargs:
+            real_kwargs = json.loads(self._kwargs)
+
+        if self._role in [TaskRole.CHORDS.value, TaskRole.CALLBACK.value]:
+            return real_kwargs
+
+        elif self._role == TaskRole.INITIALIZER.value:
+            chords = []
+            callback = None
+            for task in self.chord_tasks:
+                chords.append(task.to_json())
+            if self.callback_task:
+                callback = self.callback_task.to_json()
+            ret = {"chords": chords, "callback": callback, "kwargs": real_kwargs}
+            return ret
+        return dict()
 
     @kwargs.setter
     def kwargs(self, value):
@@ -166,3 +268,11 @@ class PeriodicTask(Model):
             return self.crontab.schedule
         else:
             raise Exception("must define interval or crontab schedule")
+
+    def to_json(self):
+        ret = dict()
+        ret["name"] = self.name
+        ret["task"] = self.task
+        ret["args"] = self.args
+        ret["kwargs"] = self.kwargs
+        return ret
