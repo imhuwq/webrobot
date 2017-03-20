@@ -1,4 +1,4 @@
-"""empty message
+"""add_uuid_to_tables_alembic_script_step_one
 
 Revision ID: 44928473a854
 Revises: c8e10588b7d8
