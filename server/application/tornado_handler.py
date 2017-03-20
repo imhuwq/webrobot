@@ -8,7 +8,7 @@ from tornado.web import RequestHandler, MissingArgumentError, Finish
 from tornado.websocket import WebSocketHandler
 
 from server.application.redis_session import Session
-from server.application.sqlalchemy_db import User
+from server.application.sqlalchemy_db import UserBase
 
 from server.extentions import Email
 
@@ -62,7 +62,7 @@ class BaseHandler(RequestHandler):
         self.set_secure_cookie("user_uuid", self.user_uuid)
 
     def get_current_user(self):
-        return self.query(User).filter_by(uuid=self.user_uuid).first()
+        return self.query(UserBase).filter_by(uuid=self.user_uuid).first()
 
     @coroutine
     def login(self, user):

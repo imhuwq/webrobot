@@ -5,7 +5,7 @@ from string import ascii_letters, digits
 from sqlalchemy import Column, String
 from bcrypt import hashpw, checkpw, gensalt
 
-from server.application.sqlalchemy_db import User as UserBase
+from server.application.sqlalchemy_db import UserBase
 
 
 class UnreadableAttr(BaseException):

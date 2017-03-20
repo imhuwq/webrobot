@@ -33,7 +33,7 @@ class DataBase:
         self.Model.metadata.drop_all(self.engine)
 
 
-class User(Model):
+class UserBase(Model):
     __tablename__ = 'users'
 
     id = Column('id', Integer, primary_key=True)

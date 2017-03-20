@@ -28,7 +28,7 @@ ValidationError = type("ValidationError", (BaseException,), {})
 
 
 class Interval(Model):
-    __tablename__ = "interval"
+    __tablename__ = "intervals"
 
     id = Column(Integer, primary_key=True)
     uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
@@ -65,7 +65,7 @@ class Interval(Model):
 
 
 class Crontab(Model):
-    __tablename__ = "crontab"
+    __tablename__ = "crontabs"
 
     id = Column(Integer, primary_key=True)
     uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
@@ -86,25 +86,49 @@ class Crontab(Model):
 
 
 class PeriodicTask(Model):
-    __tablename__ = "periodic_task"
+    __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True)
     uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
 
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship("User", foreign_keys=[user_id], backref=backref('tasks'))
+
     _role = Column("role", String, default=TaskRole.INITIALIZER.value)
     name = Column(String, unique=True)
     task = Column(String, nullable=False)
+    enabled = Column(Boolean, default=False)
+
     _args = Column("args", Text)  # list
     _kwargs = Column("kwargs", Text)  # dict
     _options = Column("options", Text)  # dict
 
-    initializer_task_id = Column(Integer, ForeignKey('periodic_task.id'))
+    initializer_task_id = Column(Integer, ForeignKey('tasks.id'))
     initializer = relationship("PeriodicTask", foreign_keys=[initializer_task_id], remote_side=id,
                                backref=backref('chord_tasks'))
 
-    header_task_id = Column(Integer, ForeignKey('periodic_task.id'))
+    header_task_id = Column(Integer, ForeignKey('tasks.id'))
     header = relationship("PeriodicTask", foreign_keys=[header_task_id], remote_side=id,
                           backref=backref('callback_task', uselist=False))
+
+    expires = Column(DateTime)
+    start_after = Column(DateTime)
+    last_run_at = Column(DateTime)
+
+    _total_run_count = Column("total_run_count", Integer, default=0)
+    _max_run_count = Column("max_run_count", Integer, default=0)
+
+    date_changed = Column(DateTime)
+    description = Column(String)
+    run_immediately = Column(Boolean)
+
+    interval_id = Column(Integer, ForeignKey('intervals.id'))
+    interval = relationship("Interval", backref=backref('task', uselist=False))
+
+    crontab_id = Column(Integer, ForeignKey('crontabs.id'))
+    crontab = relationship("Crontab", backref=backref('task', uselist=False))
+
+    no_changes = False
 
     @property
     def options(self):
@@ -180,28 +204,6 @@ class PeriodicTask(Model):
         options = self.options
         options["soft_time_limit"] = value
         self.options = options
-
-    expires = Column(DateTime)
-    start_after = Column(DateTime)
-    enabled = Column(Boolean, default=False)
-
-    last_run_at = Column(DateTime)
-
-    _total_run_count = Column("total_run_count", Integer, default=0)
-    _max_run_count = Column("max_run_count", Integer, default=0)
-
-    date_changed = Column(DateTime)
-    description = Column(String)
-
-    run_immediately = Column(Boolean)
-
-    interval_id = Column(Integer, ForeignKey('interval.id'))
-    interval = relationship("Interval", backref=backref('task', uselist=False))
-
-    crontab_id = Column(Integer, ForeignKey('crontab.id'))
-    crontab = relationship("Crontab", backref=backref('task', uselist=False))
-
-    no_changes = False
 
     @property
     def args(self):
