@@ -12,6 +12,8 @@ from server.application.sqlalchemy_db import UserBase
 
 from server.extentions import Email
 
+from server.utils import silent_return_none
+
 
 class Argument:
     def __init__(self, name, type_=str, default=None):
@@ -96,22 +98,51 @@ class BaseHandler(RequestHandler):
         self.finish()
         raise Finish()
 
+    def parse_request_body_as_json(self):
+        try:
+            data = json.loads(self.request.body.decode('utf-8'))
+        except Exception:
+            data = {}
+
+        return data
+
+    @silent_return_none
+    def _get_argument_outside_body(self, name, type_, default):
+        if default is not None:
+            value_ = self.get_argument(name, default=default)
+        else:
+            value_ = self.get_argument(name)
+
+        if isinstance(value_, str) and type_ != str:
+            value_ = json.loads(value_)
+            if not isinstance(value_, type_):
+                msg = '%s<%r> cannot be converted to type %s' % (name, value_, type_)
+                raise TypeError(msg)
+        return value_
+
+    @silent_return_none
+    def _get_argument_within_body(self, name, type_, default):
+        data = self.parse_request_body_as_json()
+        if default is not None:
+            value_ = data.get(name, default)
+        else:
+            value_ = data.get(name)
+        if isinstance(value_, str) and type_ != str:
+            value_ = json.loads(value_)
+            if not isinstance(value_, type_):
+                msg = '%s<%r> cannot be converted to type %s' % (name, value_, type_)
+                raise TypeError(msg)
+        return value_
+
     def parse_arguments(self, required_arguments):
         argument_values = []
         for argument in required_arguments:
             try:
-                if argument.default is not None:
-                    value = self.get_argument(argument.name, default=argument.default)
-                else:
-                    value = self.get_argument(argument.name)
-
-                if isinstance(value, str) and argument.type_ != str:
-                    value = json.loads(value)
-                    if not isinstance(value, argument.type_):
-                        msg = '%s<%r> cannot be converted to type %s' % (argument.name, value, argument.type_)
-                        raise TypeError(msg)
-            except MissingArgumentError:
-                self.raise_error(400, -1, msg='%s is required' % argument.name)
+                value = self._get_argument_outside_body(argument.name, argument.type_, argument.default)
+                if value is None:
+                    value = self._get_argument_within_body(argument.name, argument.type_, argument.default)
+                if value is None:
+                    self.raise_error(400, -1, msg='%s is required' % argument.name)
             except TypeError as e:
                 msg = str(e)
                 self.raise_error(400, -1, msg=msg)

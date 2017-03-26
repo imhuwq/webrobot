@@ -1,11 +1,17 @@
 from celery import chord
+from enum import Enum
 
 from server.modules.celery import celery_app
 from server.modules.celery.task.task_base import register_task, TASKS_MAP
 from server.modules.celery.task.requests_task import RequestsTask
 
 
-@celery_app.task(name='celery_task_initializer')
+class TaskTypes(Enum):
+    HTTP_REQUEST_REQUESTS_GET = 'http_request.requests.get'
+    CONSOLE_NOTIFIER_PYTHON_PRINT = 'console_notifier.python.print'
+
+
+@celery_app.task(name=TaskTypes.HTTP_REQUEST_REQUESTS_GET)
 def init_task(*args, **kwargs):
     chord_tasks = kwargs.get("chords", [])
 
@@ -39,7 +45,7 @@ def requests_get(*args, **kwargs):
 
 
 @register_task
-@celery_app.task(name='console_notifier.python.print')
+@celery_app.task(name=TaskTypes.CONSOLE_NOTIFIER_PYTHON_PRINT)
 def python_print(*args, **kwargs):
     msg = kwargs.get("msg")
     print("msg: %s" % msg)
