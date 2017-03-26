@@ -6,6 +6,9 @@ from .sqlalchemy_db import DataBase
 
 from server.instance import SETTINGS, DB_URI, TEST_DB_URI, DEVE_DB_URI, REDIS_CONFIG
 
+redis = RedisManager()
+db = DataBase()
+
 
 def create_app(handlers, mode='production'):
     settings = SETTINGS.copy()
@@ -41,11 +44,8 @@ def create_app(handlers, mode='production'):
     app.mode = mode
     app.redis_config = REDIS_CONFIG.copy()
 
-    redis = RedisManager()
-    database = DataBase()
-
     redis.init_app(app)
-    database.init_app(app)
+    db.init_app(app)
     if mode != 'production':
         app.db.create_all()
     return app

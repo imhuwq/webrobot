@@ -18,3 +18,4 @@ apiv1 = API(name='api_v1', prefix='/api/v1')
 
 from .main import main
 from .user import user
+from .task import task

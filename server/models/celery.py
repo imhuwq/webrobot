@@ -6,7 +6,9 @@ from sqlalchemy.orm import relationship, backref
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
 import celery.schedules
 
+from server.application import db
 from server.utils import gen_uuid
+from server.modules.celery.task import TaskTypes
 from server.application.sqlalchemy_db import Model
 
 
@@ -28,7 +30,7 @@ ValidationError = type("ValidationError", (BaseException,), {})
 
 
 class Interval(Model):
-    __tablename__ = "interval"
+    __tablename__ = "intervals"
 
     id = Column(Integer, primary_key=True)
     uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
@@ -63,9 +65,18 @@ class Interval(Model):
     def period_singular(self):
         return self.period[:-1]
 
+    @classmethod
+    def new_interval(cls, every, unit):
+        interval = cls()
+        interval.every = every
+        interval.period = unit
+        db.session.add(interval)
+        db.session.flush()
+        return interval
+
 
 class Crontab(Model):
-    __tablename__ = "crontab"
+    __tablename__ = "crontabs"
 
     id = Column(Integer, primary_key=True)
     uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
@@ -84,27 +95,63 @@ class Crontab(Model):
                                         day_of_month=self.day_of_month,
                                         month_of_year=self.month_of_year)
 
+    @classmethod
+    def new_crontab(cls, minute, hour, day_of_week, day_of_month, month_of_year):
+        crontab = cls()
+        crontab.minute = minute
+        crontab.hour = hour
+        crontab.day_of_week = day_of_week
+        crontab.day_of_month = day_of_month
+        crontab.month_of_year = month_of_year
+        db.session.add(crontab)
+        db.session.flush()
+        return crontab
+
 
 class PeriodicTask(Model):
-    __tablename__ = "periodic_task"
+    __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True)
     uuid = Column('uuid', String, nullable=False, unique=True, default=gen_uuid)
 
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship("User", foreign_keys=[user_id], backref=backref('tasks'))
+
     _role = Column("role", String, default=TaskRole.INITIALIZER.value)
     name = Column(String, unique=True)
-    task = Column(String, nullable=False)
+    _task = Column("task", String, nullable=False)
+    enabled = Column(Boolean, default=False)
+
     _args = Column("args", Text)  # list
     _kwargs = Column("kwargs", Text)  # dict
     _options = Column("options", Text)  # dict
 
-    initializer_task_id = Column(Integer, ForeignKey('periodic_task.id'))
+    initializer_task_id = Column(Integer, ForeignKey('tasks.id'))
     initializer = relationship("PeriodicTask", foreign_keys=[initializer_task_id], remote_side=id,
                                backref=backref('chord_tasks'))
 
-    header_task_id = Column(Integer, ForeignKey('periodic_task.id'))
+    header_task_id = Column(Integer, ForeignKey('tasks.id'))
     header = relationship("PeriodicTask", foreign_keys=[header_task_id], remote_side=id,
                           backref=backref('callback_task', uselist=False))
+
+    expires = Column(DateTime)
+    start_after = Column(DateTime, default=datetime.datetime.utcnow)
+    last_run_at = Column(DateTime)
+
+    _total_run_count = Column("total_run_count", Integer, default=0)
+    _max_run_count = Column("max_run_count", Integer, default=0)
+
+    date_changed = Column(DateTime)
+    description = Column(String)
+    run_immediately = Column(Boolean, default=False)
+
+    interval_id = Column(Integer, ForeignKey('intervals.id'))
+    interval = relationship("Interval", backref=backref('task', uselist=False))
+
+    crontab_id = Column(Integer, ForeignKey('crontabs.id'))
+    crontab = relationship("Crontab", backref=backref('task', uselist=False))
+
+    no_changes = False
 
     @property
     def options(self):
@@ -181,27 +228,25 @@ class PeriodicTask(Model):
         options["soft_time_limit"] = value
         self.options = options
 
-    expires = Column(DateTime)
-    start_after = Column(DateTime)
-    enabled = Column(Boolean, default=False)
+    @property
+    def role(self):
+        return TaskRole(self._role)
 
-    last_run_at = Column(DateTime)
+    @role.setter
+    def role(self, value):
+        if not isinstance(value, TaskRole):
+            value = TaskRole(value)
+        self._role = value.value
 
-    _total_run_count = Column("total_run_count", Integer, default=0)
-    _max_run_count = Column("max_run_count", Integer, default=0)
+    @property
+    def task(self):
+        return TaskTypes(self._task)
 
-    date_changed = Column(DateTime)
-    description = Column(String)
-
-    run_immediately = Column(Boolean)
-
-    interval_id = Column(Integer, ForeignKey('interval.id'))
-    interval = relationship("Interval", backref=backref('task', uselist=False))
-
-    crontab_id = Column(Integer, ForeignKey('crontab.id'))
-    crontab = relationship("Crontab", backref=backref('task', uselist=False))
-
-    no_changes = False
+    @task.setter
+    def task(self, value):
+        if not isinstance(value, TaskTypes):
+            value = TaskTypes(value)
+        self._task = value.value
 
     @property
     def args(self):
@@ -281,3 +326,52 @@ class PeriodicTask(Model):
         ret["args"] = self.args
         ret["kwargs"] = self.kwargs
         return ret
+
+    @classmethod
+    def new_init_task(cls, user, period):
+        init = cls(user=user)
+        init.role = TaskRole.INITIALIZER
+        init.task = TaskTypes.TASK_INITIALIZER
+        db.session.add(init)
+        db.session.flush()
+
+        method = period.get("method")
+        if method == "interval":
+            interval = Interval.new_interval(period.get("every"), period.get("unit"))
+            init.interval = interval
+        elif method == "crontab":
+            crontab = Crontab.new_crontab(
+                period.get("minute"),
+                period.get("hour"),
+                period.get("day_of_week"),
+                period.get("day_of_month"),
+                period.get("month_of_year"),
+            )
+            init.crontab = crontab
+        db.session.flush()
+
+        return init
+
+    @classmethod
+    def new_chord_task(cls, chord, init_task):
+        task = cls()
+        task.role = TaskRole.CHORDS
+        task.task = chord.get("type")
+        task.args = chord.get("args", [])
+        task.kwargs = chord.get("kwargs")
+        task.initializer = init_task
+        db.session.add(task)
+        db.session.flush()
+        return task
+
+    @classmethod
+    def new_callback_task(cls, callback, init_task):
+        task = cls()
+        task.role = TaskRole.CALLBACK
+        task.task = callback.get("type")
+        task.args = callback.get("args", [])
+        task.kwargs = callback.get("kwargs")
+        task.header = init_task
+        db.session.add(task)
+        db.session.flush()
+        return task
