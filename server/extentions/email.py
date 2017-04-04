@@ -5,6 +5,7 @@ from threading import Thread
 
 
 class Email:
+
     def __init__(self, app):
         self.app = app
 
@@ -36,7 +37,8 @@ class Email:
         if isinstance(self.msg, MIMEText):
             server = smtplib.SMTP_SSL(self.host, self.port)
             server.login(self.sender, self.password)
-            server.sendmail(self.sender, self.receiver, msg=self.msg.as_string())
+            server.sendmail(
+                self.sender, self.receiver, msg=self.msg.as_string())
             server.quit()
         else:
             raise Exception('Please write your message before you send it')

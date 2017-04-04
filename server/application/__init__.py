@@ -10,25 +10,25 @@ redis = RedisManager()
 db = DataBase()
 
 
-def create_app(handlers, mode='production'):
+def create_app(handlers, mode="production"):
     settings = SETTINGS.copy()
 
-    if mode == 'testing':
-        settings['xsrf_cookies'] = False
+    if mode == "testing":
+        settings["xsrf_cookies"] = False
         app = Application(
             handlers=handlers,
             db_uri=TEST_DB_URI,
             **settings
         )
-    elif mode == 'with_xsrf':
+    elif mode == "with_xsrf":
         app = Application(
             handlers=handlers,
             db_uri=TEST_DB_URI,
             **settings
         )
-    elif mode == 'develop':
-        settings['xsrf_cookies'] = False
-        settings['debug'] = True
+    elif mode == "develop":
+        settings["xsrf_cookies"] = False
+        settings["debug"] = True
         app = Application(
             handlers=handlers,
             db_uri=DEVE_DB_URI,
@@ -46,6 +46,6 @@ def create_app(handlers, mode='production'):
 
     redis.init_app(app)
     db.init_app(app)
-    if mode != 'production':
+    if mode != "production":
         app.db.create_all()
     return app

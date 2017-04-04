@@ -56,7 +56,7 @@ class SAScheduler(Scheduler):
 
     @property
     def objects(self):
-        objs = self.query(self.Model).filter_by(enabled=True, _role=TaskRole.INITIALIZER.value).all()
+        objs = self.query(self.Model).filter_by(enabled=True, _role=TaskRole.TRIGGER.value).all()
         return objs
 
     def get_from_database(self):
@@ -64,6 +64,7 @@ class SAScheduler(Scheduler):
         records = {}
         for obj in self.objects:
             records[obj.name] = self.Entry(obj)
+        print(records)
         return records
 
     @property

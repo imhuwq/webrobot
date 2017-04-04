@@ -21,8 +21,8 @@ class PERIODS(Enum):
 
 
 class TaskRole(Enum):
+    TRIGGER = 'trigger'
     CHORDS = 'chords'
-    INITIALIZER = 'initializer'
     CALLBACK = 'callback'
 
 
@@ -117,7 +117,7 @@ class PeriodicTask(Model):
     user_id = Column(Integer, ForeignKey('users.id'))
     user = relationship("User", foreign_keys=[user_id], backref=backref('tasks'))
 
-    _role = Column("role", String, default=TaskRole.INITIALIZER.value)
+    _role = Column("role", String, default=TaskRole.TRIGGER.value)
     name = Column(String, unique=True)
     _task = Column("task", String, nullable=False)
     enabled = Column(Boolean, default=False)
@@ -240,6 +240,10 @@ class PeriodicTask(Model):
 
     @property
     def task(self):
+        return self._task
+
+    @property
+    def task_type(self):
         return TaskTypes(self._task)
 
     @task.setter
@@ -274,7 +278,7 @@ class PeriodicTask(Model):
         if self._role in [TaskRole.CHORDS.value, TaskRole.CALLBACK.value]:
             return real_kwargs
 
-        elif self._role == TaskRole.INITIALIZER.value:
+        elif self._role == TaskRole.TRIGGER.value:
             chords = []
             callback = None
             for task in self.chord_tasks:
@@ -330,8 +334,8 @@ class PeriodicTask(Model):
     @classmethod
     def new_init_task(cls, user, period):
         init = cls(user=user)
-        init.role = TaskRole.INITIALIZER
-        init.task = TaskTypes.TASK_INITIALIZER
+        init.role = TaskRole.TRIGGER
+        init.task = TaskTypes.TASK_TRIGGER
         db.session.add(init)
         db.session.flush()
 

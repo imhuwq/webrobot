@@ -4,6 +4,7 @@ from tornado.gen import coroutine
 
 
 class Session(dict):
+
     def __init__(self, handler):
         super(Session, self).__init__()
         self.handler = handler
@@ -14,7 +15,7 @@ class Session(dict):
 
     @coroutine
     def prepare(self):
-        self.key = 'session_%s' % self.handler.user_uuid
+        self.key = "session_%s" % self.handler.user_uuid
         yield self.get_all()
 
     @coroutine
@@ -28,14 +29,14 @@ class Session(dict):
 
     @coroutine
     def update_redis(self):
-        yield self.client.call("set", self.key, json.dumps(self), 'ex', self.default_ttl)
+        yield self.client.call("set", self.key, json.dumps(self), "ex", self.default_ttl)
 
     @coroutine
     def rename(self, new_key):
-        session = yield self.client.call('get', self.key)
+        session = yield self.client.call("get", self.key)
         if session:
-            new_key = 'session_%s' % new_key
-            yield self.client.call('rename', self.key, new_key)
+            new_key = "session_%s" % new_key
+            yield self.client.call("rename", self.key, new_key)
             self.key = new_key
 
     @coroutine

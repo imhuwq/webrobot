@@ -9,12 +9,12 @@ from server.modules.celery.task.requests_task import RequestsTask
 
 
 class TaskTypes(Enum):
-    TASK_INITIALIZER = "celery_task_initializer"
+    TASK_TRIGGER = "celery_task_trigger"
     HTTP_REQUEST_REQUESTS_GET = "http_request.requests.get"
     CONSOLE_NOTIFIER_PYTHON_PRINT = "console_notifier.python.print"
 
 
-@celery_app.task(name="celery_task_initializer")
+@celery_app.task(name=TaskTypes.TASK_TRIGGER.value)
 def init_task(*args, **kwargs):
     chord_tasks = kwargs.get("chords", [])
 
@@ -37,7 +37,7 @@ def init_task(*args, **kwargs):
 
 
 @register_task
-@celery_app.task(name=TaskTypes.HTTP_REQUEST_REQUESTS_GET)
+@celery_app.task(name=TaskTypes.HTTP_REQUEST_REQUESTS_GET.value)
 def requests_get(*args, **kwargs):
     url = kwargs.get("url")
     headers = kwargs.get("headers")
@@ -48,7 +48,7 @@ def requests_get(*args, **kwargs):
 
 
 @register_task
-@celery_app.task(name=TaskTypes.CONSOLE_NOTIFIER_PYTHON_PRINT)
+@celery_app.task(name=TaskTypes.CONSOLE_NOTIFIER_PYTHON_PRINT.value)
 def python_print(*args, **kwargs):
     msg = kwargs.get("msg")
     print("msg: %s" % msg)
@@ -128,7 +128,7 @@ def validate_crontab(period):
     return True, "ok"
 
 
-@register_validator(TaskTypes.TASK_INITIALIZER.value)
+@register_validator(TaskTypes.TASK_TRIGGER.value)
 def validate_initializer(task):
     period = task.get("period", None)
     method = period.get("method", None)
