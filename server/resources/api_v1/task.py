@@ -3,7 +3,8 @@ from server.resources.api_v1 import apiv1, BaseHandler
 from server.models.celery import TaskRole
 from server.models.celery import PeriodicTask as Task
 
-from server.modules.celery.task.tasks import TaskTypes, validate_tasks, validate_task
+from server.modules.celery.task.tasks import TaskTypes
+from server.modules.celery.task.task_validator import validate_tasks, validate_task
 
 from server.application.tornado_handler import login_required, Argument
 
@@ -38,11 +39,11 @@ class TaskIndexResource(BaseHandler):
         if status is False:
             self.raise_error(400, msg=msg)
 
-        init_task = Task.new_init_task(self.current_user, init.get("period"))
+        trigger_task = Task.new_trigger_task(self.current_user, init.get("period"))
         for chord in chords:
-            Task.new_chord_task(chord, init_task)
+            Task.new_chord_task(chord, trigger_task)
 
-        Task.new_callback_task(callback, init_task)
+        Task.new_callback_task(callback, trigger_task)
         self.db_session.commit()
 
         self.start_response()

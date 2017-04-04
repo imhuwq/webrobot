@@ -332,7 +332,7 @@ class PeriodicTask(Model):
         return ret
 
     @classmethod
-    def new_init_task(cls, user, period):
+    def new_trigger_task(cls, user, period):
         init = cls(user=user)
         init.role = TaskRole.TRIGGER
         init.task = TaskTypes.TASK_TRIGGER
