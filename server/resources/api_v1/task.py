@@ -47,3 +47,7 @@ class TaskIndexResource(BaseHandler):
         self.db_session.commit()
 
         self.start_response()
+
+# todo: create task chain by posting every task details is complicated
+#       consider create each task individually, so users can chain them together by just telling me their task uids
+#       perhaps only tasks of the same user can be chained
